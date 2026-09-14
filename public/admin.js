@@ -28,10 +28,13 @@ async function loadRequests() {
 
   for (const r of data.requests) {
     const tr = document.createElement('tr');
+    const channelLabel = r.channel_title
+      ? `${r.channel_title}${r.channel_id ? ` (${r.channel_id})` : ''}`
+      : r.channel_url || r.channel_id || '（未解決）';
     tr.innerHTML = `
       <td>${r.id}</td>
       <td>${r.type === 'add' ? '追加' : '除外'}</td>
-      <td>${r.channel_url || r.channel_id || ''}</td>
+      <td>${channelLabel}${r.channel_url && r.channel_title ? `<br><small>${r.channel_url}</small>` : ''}</td>
       <td>${r.note || ''}</td>
       <td>
         <button data-action="approve" data-id="${r.id}">承認</button>
@@ -53,7 +56,8 @@ async function loadRequests() {
       if (res.ok) {
         loadRequests();
       } else {
-        showResult('処理に失敗しました。');
+        const data = await res.json().catch(() => ({}));
+        showResult(data.message || '処理に失敗しました。');
       }
     });
   });

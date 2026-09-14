@@ -80,6 +80,64 @@ export async function getChannelsDetail(channelIds) {
   return { items, quotaUsed: QUOTA_COST.VIDEOS_LIST };
 }
 
+function normalizeChannelItem(item) {
+  if (!item) return null;
+  return {
+    channelId: item.id,
+    title: item.snippet.title,
+    description: item.snippet.description,
+    thumbnailUrl: item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url,
+  };
+}
+
+/**
+ * チャンネルURL・ハンドル名・チャンネルID・チャンネル名などの入力から
+ * チャンネル情報（channelId等）を解決する。
+ * コスト: 通常1 unit、URL/ハンドルから特定できない場合のみ検索(100 units)にフォールバックする。
+ */
+export async function resolveChannel(rawInput) {
+  const input = (rawInput || '').trim();
+  if (!input) return { item: null, quotaUsed: 0 };
+
+  let m;
+
+  // https://www.youtube.com/channel/UCxxxx 形式、またはID単体
+  if ((m = input.match(/\/channel\/(UC[\w-]{10,})/)) || /^UC[\w-]{10,}$/.test(input)) {
+    const channelId = m ? m[1] : input;
+    const { items, quotaUsed } = await getChannelsDetail([channelId]);
+    return { item: items[0] || { channelId, title: null, description: null, thumbnailUrl: null }, quotaUsed };
+  }
+
+  // https://www.youtube.com/@handle 形式、または @handle 単体
+  if ((m = input.match(/\/@([\w.-]+)/)) || (m = input.match(/^@([\w.-]+)$/))) {
+    const handle = `@${m[1]}`;
+    const data = await callApi('channels', { part: 'snippet', forHandle: handle });
+    return { item: normalizeChannelItem(data.items?.[0]), quotaUsed: QUOTA_COST.VIDEOS_LIST };
+  }
+
+  // https://www.youtube.com/user/Username 形式（旧レガシーユーザー名）
+  if ((m = input.match(/\/user\/([\w-]+)/i))) {
+    const data = await callApi('channels', { part: 'snippet', forUsername: m[1] });
+    return { item: normalizeChannelItem(data.items?.[0]), quotaUsed: QUOTA_COST.VIDEOS_LIST };
+  }
+
+  // それ以外（/c/CustomName やチャンネル名そのものなど）はキーワード検索でフォールバック
+  const query = (input.match(/\/c\/([\w-]+)/i)?.[1] || input).trim();
+  const data = await callApi('search', { part: 'snippet', q: query, type: 'channel', maxResults: 1 });
+  const found = data.items?.[0];
+  if (!found) return { item: null, quotaUsed: QUOTA_COST.SEARCH_LIST };
+
+  return {
+    item: {
+      channelId: found.id.channelId,
+      title: found.snippet.title,
+      description: found.snippet.description,
+      thumbnailUrl: found.snippet.thumbnails?.medium?.url || found.snippet.thumbnails?.default?.url,
+    },
+    quotaUsed: QUOTA_COST.SEARCH_LIST,
+  };
+}
+
 /**
  * 動画ID一覧の現在の状態（同時視聴者数・終了有無）を取得する。
  * コスト: 約1 unit / 呼び出し（最大50 id）

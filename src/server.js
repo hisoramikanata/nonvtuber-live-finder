@@ -2,13 +2,27 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { config } from './config.js';
-import { query, getTodayQuotaUsage } from './db.js';
+import { query, getTodayQuotaUsage, addQuotaUsage } from './db.js';
+import { resolveChannel } from './youtube.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
+
+// チャンネルURL/ハンドル名/ID等からチャンネル情報を解決する（失敗時はnullを返し、呼び出し元で処理を継続させる）
+async function tryResolveChannel(input) {
+  if (!input) return null;
+  try {
+    const { item, quotaUsed } = await resolveChannel(input);
+    if (quotaUsed) await addQuotaUsage(quotaUsed);
+    return item;
+  } catch (err) {
+    console.error('[resolveChannel] failed:', err.message);
+    return null;
+  }
+}
 
 function requireAdmin(req, res, next) {
   const token = req.header('x-admin-token');
@@ -94,9 +108,12 @@ app.post('/api/requests', async (req, res) => {
       return res.status(400).json({ error: 'channelUrl or channelId is required' });
     }
 
+    // 申請時点でURL/ハンドル名からチャンネルIDへの解決を試みる（失敗しても申請自体は受け付ける）
+    const resolved = await tryResolveChannel(channelId || channelUrl);
+
     await query(
-      `INSERT INTO requests (channel_id, channel_url, type, note) VALUES ($1, $2, $3, $4)`,
-      [channelId || null, channelUrl || null, type, note || null]
+      `INSERT INTO requests (channel_id, channel_url, channel_title, type, note) VALUES ($1, $2, $3, $4, $5)`,
+      [resolved?.channelId || channelId || null, channelUrl || null, resolved?.title || null, type, note || null]
     );
 
     res.status(201).json({ ok: true });
@@ -125,23 +142,45 @@ app.post('/api/admin/requests/:id/resolve', requireAdmin, async (req, res) => {
   const reqRow = rows[0];
   if (!reqRow) return res.status(404).json({ error: 'not_found' });
 
-  if (action === 'approve' && reqRow.channel_id) {
+  if (action === 'approve') {
+    let channelId = reqRow.channel_id;
+    let channelTitle = reqRow.channel_title;
+
+    // 申請時にチャンネルIDを解決できていなかった場合、承認時にもう一度試みる
+    if (!channelId && reqRow.channel_url) {
+      const resolved = await tryResolveChannel(reqRow.channel_url);
+      if (resolved?.channelId) {
+        channelId = resolved.channelId;
+        channelTitle = resolved.title;
+      }
+    }
+
+    if (!channelId) {
+      return res.status(422).json({
+        error: 'channel_not_resolved',
+        message: 'チャンネルIDを特定できませんでした。URLを確認して申請し直してもらうか、チャンネルIDを直接調べて教えてください。',
+      });
+    }
+
     if (reqRow.type === 'add') {
       await query(
         `INSERT INTO channels (channel_id, channel_title, status)
-         VALUES ($1, $1, 'active')
-         ON CONFLICT (channel_id) DO UPDATE SET status = 'active', exclude_reason = NULL`,
-        [reqRow.channel_id]
+         VALUES ($1, $2, 'active')
+         ON CONFLICT (channel_id) DO UPDATE SET status = 'active', exclude_reason = NULL, channel_title = EXCLUDED.channel_title`,
+        [channelId, channelTitle || channelId]
       );
     } else if (reqRow.type === 'remove') {
       await query(
         `INSERT INTO channels (channel_id, channel_title, status, exclude_reason)
-         VALUES ($1, $1, 'excluded', '手動申請による除外')
+         VALUES ($1, $2, 'excluded', '手動申請による除外')
          ON CONFLICT (channel_id) DO UPDATE SET status = 'excluded', exclude_reason = '手動申請による除外'`,
-        [reqRow.channel_id]
+        [channelId, channelTitle || channelId]
       );
-      await query('UPDATE live_status SET is_live = false WHERE channel_id = $1', [reqRow.channel_id]);
+      await query('UPDATE live_status SET is_live = false WHERE channel_id = $1', [channelId]);
     }
+
+    // 解決結果をリクエストにも保存しておく（管理画面での表示用）
+    await query('UPDATE requests SET channel_id = $2, channel_title = $3 WHERE id = $1', [id, channelId, channelTitle]);
   }
 
   await query("UPDATE requests SET status = $2, resolved_at = now() WHERE id = $1", [
