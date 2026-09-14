@@ -4,6 +4,7 @@ import express from 'express';
 import { config } from './config.js';
 import { query, getTodayQuotaUsage, addQuotaUsage } from './db.js';
 import { resolveChannel } from './youtube.js';
+import { classify } from './vtuberFilter.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -21,6 +22,26 @@ async function tryResolveChannel(input) {
   } catch (err) {
     console.error('[resolveChannel] failed:', err.message);
     return null;
+  }
+}
+
+// チャンネルをactive/excludedとして確定させる（channels・live_statusへの反映）
+async function applyChannelDecision(channelId, channelTitle, decision, reason) {
+  if (decision === 'active') {
+    await query(
+      `INSERT INTO channels (channel_id, channel_title, status)
+       VALUES ($1, $2, 'active')
+       ON CONFLICT (channel_id) DO UPDATE SET status = 'active', exclude_reason = NULL, channel_title = EXCLUDED.channel_title`,
+      [channelId, channelTitle || channelId]
+    );
+  } else {
+    await query(
+      `INSERT INTO channels (channel_id, channel_title, status, exclude_reason)
+       VALUES ($1, $2, 'excluded', $3)
+       ON CONFLICT (channel_id) DO UPDATE SET status = 'excluded', exclude_reason = EXCLUDED.exclude_reason`,
+      [channelId, channelTitle || channelId, reason || null]
+    );
+    await query('UPDATE live_status SET is_live = false WHERE channel_id = $1', [channelId]);
   }
 }
 
@@ -97,7 +118,8 @@ app.get('/api/stats', async (req, res) => {
   }
 });
 
-// チャンネルの追加/除外リクエストを受け付ける（一般ユーザー向け）
+// チャンネルの追加/除外リクエストを受け付ける（一般ユーザー向け）。
+// その場でチャンネルを解決・審査し、可能な限り保留にせず即時反映する。
 app.post('/api/requests', async (req, res) => {
   try {
     const { channelUrl, channelId, type, note } = req.body || {};
@@ -108,15 +130,58 @@ app.post('/api/requests', async (req, res) => {
       return res.status(400).json({ error: 'channelUrl or channelId is required' });
     }
 
-    // 申請時点でURL/ハンドル名からチャンネルIDへの解決を試みる（失敗しても申請自体は受け付ける）
     const resolved = await tryResolveChannel(channelId || channelUrl);
 
+    // チャンネルを特定できなかった場合のみ、保留（要手動対応）として記録する
+    if (!resolved?.channelId) {
+      await query(
+        `INSERT INTO requests (channel_id, channel_url, channel_title, type, note, status)
+         VALUES ($1, $2, $3, $4, $5, 'pending')`,
+        [channelId || null, channelUrl || null, null, type, note || null]
+      );
+      return res.status(202).json({
+        ok: true,
+        status: 'pending',
+        message: 'チャンネルを自動で特定できなかったため、運営側の確認待ちになりました。',
+      });
+    }
+
+    let finalStatus;
+    let reason = null;
+
+    if (type === 'add') {
+      const result = classify({ channelTitle: resolved.title, channelDescription: resolved.description });
+      if (result.excluded) {
+        finalStatus = 'rejected';
+        reason = result.reason;
+      } else {
+        finalStatus = 'approved';
+        await applyChannelDecision(resolved.channelId, resolved.title, 'active');
+      }
+    } else {
+      // 除外申請は内容審査の上、基本的にそのまま反映する
+      finalStatus = 'approved';
+      reason = 'ユーザー申請による除外';
+      await applyChannelDecision(resolved.channelId, resolved.title, 'excluded', reason);
+    }
+
     await query(
-      `INSERT INTO requests (channel_id, channel_url, channel_title, type, note) VALUES ($1, $2, $3, $4, $5)`,
-      [resolved?.channelId || channelId || null, channelUrl || null, resolved?.title || null, type, note || null]
+      `INSERT INTO requests (channel_id, channel_url, channel_title, type, note, status, resolved_at)
+       VALUES ($1, $2, $3, $4, $5, $6, now())`,
+      [resolved.channelId, channelUrl || null, resolved.title, type, note || null, finalStatus]
     );
 
-    res.status(201).json({ ok: true });
+    res.status(201).json({
+      ok: true,
+      status: finalStatus,
+      channelTitle: resolved.title,
+      message:
+        type === 'add'
+          ? finalStatus === 'approved'
+            ? `「${resolved.title}」を追加しました。`
+            : `「${resolved.title}」はVTuber/対象外と判定されたため追加できませんでした（${reason}）。誤りの場合は運営にご連絡ください。`
+          : `「${resolved.title}」を除外しました。`,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'internal_error' });
@@ -163,20 +228,9 @@ app.post('/api/admin/requests/:id/resolve', requireAdmin, async (req, res) => {
     }
 
     if (reqRow.type === 'add') {
-      await query(
-        `INSERT INTO channels (channel_id, channel_title, status)
-         VALUES ($1, $2, 'active')
-         ON CONFLICT (channel_id) DO UPDATE SET status = 'active', exclude_reason = NULL, channel_title = EXCLUDED.channel_title`,
-        [channelId, channelTitle || channelId]
-      );
+      await applyChannelDecision(channelId, channelTitle, 'active');
     } else if (reqRow.type === 'remove') {
-      await query(
-        `INSERT INTO channels (channel_id, channel_title, status, exclude_reason)
-         VALUES ($1, $2, 'excluded', '手動申請による除外')
-         ON CONFLICT (channel_id) DO UPDATE SET status = 'excluded', exclude_reason = '手動申請による除外'`,
-        [channelId, channelTitle || channelId]
-      );
-      await query('UPDATE live_status SET is_live = false WHERE channel_id = $1', [channelId]);
+      await applyChannelDecision(channelId, channelTitle, 'excluded', '手動申請による除外');
     }
 
     // 解決結果をリクエストにも保存しておく（管理画面での表示用）

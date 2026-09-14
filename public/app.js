@@ -94,9 +94,14 @@ document.getElementById('request-form').addEventListener('submit', async (e) => 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ channelUrl, type, note }),
     });
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error('request failed');
-    resultEl.textContent = '送信しました。ご協力ありがとうございます。';
+    resultEl.textContent = data.message || '送信しました。ご協力ありがとうございます。';
     e.target.reset();
+    if (data.status === 'approved') {
+      loadStreams();
+      loadStats();
+    }
   } catch (err) {
     resultEl.textContent = '送信に失敗しました。時間をおいて再試行してください。';
   }
