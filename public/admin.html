@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>管理画面 - リクエスト対応</title>
+<link rel="stylesheet" href="style.css" />
+<style>
+  main { max-width: 800px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { border: 1px solid var(--border); padding: 8px; text-align: left; }
+  button { cursor: pointer; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); margin-right: 4px; }
+  #token-box { display: flex; gap: 8px; margin-bottom: 16px; }
+  #token-box input { flex: 1; padding: 8px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>管理画面: 追加/除外リクエスト</h1>
+  </header>
+  <main>
+    <div id="token-box">
+      <input type="password" id="admin-token" placeholder="ADMIN_TOKENを入力" />
+      <button id="load-btn">読み込み</button>
+      <button id="run-discovery">発見バッチを手動実行</button>
+      <button id="run-monitor">監視バッチを手動実行</button>
+    </div>
+    <div id="result"></div>
+    <table id="req-table" hidden>
+      <thead><tr><th>ID</th><th>種別</th><th>チャンネル</th><th>補足</th><th>操作</th></tr></thead>
+      <tbody id="req-body"></tbody>
+    </table>
+  </main>
+  <script src="admin.js"></script>
+</body>
+</html>

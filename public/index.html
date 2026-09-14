@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>同接少なめライブ配信ファインダー（VTuber以外）</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>同接少なめライブ配信ファインダー</h1>
+    <p class="sub">VTuber以外のYouTubeライブ配信を、同時視聴者数が少ない順に表示します。</p>
+    <div id="stats" class="stats"></div>
+  </header>
+
+  <main>
+    <div id="loading" class="loading">読み込み中…</div>
+    <div id="empty" class="empty" hidden>現在ライブ中の配信が見つかりませんでした。しばらくしてから再読み込みしてください。</div>
+    <div id="grid" class="grid"></div>
+  </main>
+
+  <section class="request-box">
+    <h2>チャンネルの追加・除外をリクエスト</h2>
+    <p>「これはVTuberではない」「これはVTuber/対象外なので外してほしい」等のリクエストを送れます。運営が確認して反映します。</p>
+    <form id="request-form">
+      <input type="url" id="channel-url" placeholder="https://www.youtube.com/channel/..." required />
+      <select id="request-type">
+        <option value="add">追加してほしい</option>
+        <option value="remove">除外してほしい</option>
+      </select>
+      <input type="text" id="note" placeholder="補足（任意）" />
+      <button type="submit">送信</button>
+    </form>
+    <p id="request-result"></p>
+  </section>
+
+  <footer>
+    <p>
+      このサイトは YouTube Data API v3 を利用しています。スクレイピング／クローリングは行っていません。
+      VTuber判定はキーワードによる簡易的なものです。誤りがあれば上のフォームからご報告ください。
+    </p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
