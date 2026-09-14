@@ -20,6 +20,8 @@ export const config = {
     '雑談配信,顔出し配信,ゲーム実況 ライブ,歌枠 生放送,ライブ配信中,フリートーク 配信'
   ),
   monitorCron: process.env.MONITOR_CRON || '*/10 * * * *',
+  // 同時視聴者数がこの人数以上の配信は「同接少なめ」の対象外として一覧から除外する
+  maxConcurrentViewers: Number(process.env.MAX_CONCURRENT_VIEWERS || 10),
 };
 
 export function assertYoutubeKey() {
