@@ -273,6 +273,19 @@ app.post('/api/admin/run/discovery', requireAdmin, async (req, res) => {
   }
 });
 
+// 管理用: ピン留めチャンネル(config.pinnedChannelHandles)をchannelsテーブルに登録する
+app.post('/api/admin/run/ensure-pinned', requireAdmin, async (req, res) => {
+  try {
+    const { ensurePinnedChannels } = await import('./pinnedChannels.js');
+    await ensurePinnedChannels();
+    const { rows } = await query('SELECT channel_id, channel_title FROM channels WHERE is_pinned = true');
+    res.json({ ok: true, pinned: rows });
+  } catch (err) {
+    console.error('[admin] ensure-pinned failed:', err);
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
+
 // 管理用: DBマイグレーションを実行する(Railwayのシェルが使えない場合の代替手段)
 app.post('/api/admin/migrate', requireAdmin, async (req, res) => {
   try {

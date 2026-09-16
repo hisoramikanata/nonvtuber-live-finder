@@ -23,7 +23,7 @@ export async function runMonitor() {
 
   if (videoIds.length === 0) {
     console.log('[monitor] 監視対象なし');
-    return { checked: 0, ended: 0, quotaUsed: pinnedResult.quotaUsed };
+    return { checked: 0, ended: 0, quotaUsed: pinnedResult.quotaUsed, pinned: pinnedResult };
   }
 
   let checked = 0;
@@ -66,5 +66,5 @@ export async function runMonitor() {
   }
 
   console.log(`[monitor] done. checked=${checked} ended=${ended} quota=${totalQuota}`);
-  return { checked, ended, quotaUsed: totalQuota };
+  return { checked, ended, quotaUsed: totalQuota, pinned: pinnedResult };
 }

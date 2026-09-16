@@ -102,3 +102,13 @@ document.getElementById('run-migrate').addEventListener('click', async () => {
   const data = await res.json();
   showResult(`マイグレーション結果: ${JSON.stringify(data)}`);
 });
+
+document.getElementById('run-ensure-pinned').addEventListener('click', async () => {
+  showResult('ピン留めチャンネル登録中…');
+  const res = await fetch('/api/admin/run/ensure-pinned', {
+    method: 'POST',
+    headers: { 'x-admin-token': getToken() },
+  });
+  const data = await res.json();
+  showResult(`ピン留め登録結果: ${JSON.stringify(data)}`);
+});
