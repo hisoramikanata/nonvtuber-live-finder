@@ -22,6 +22,8 @@ export const config = {
   monitorCron: process.env.MONITOR_CRON || '*/10 * * * *',
   // 同時視聴者数がこの人数以上の配信は「同接少なめ」の対象外として一覧から除外する
   maxConcurrentViewers: Number(process.env.MAX_CONCURRENT_VIEWERS || 10),
+  // 配信開始からこの時間数（時間）を超えて続いている配信（耐久配信等）は一覧・件数から除外する
+  maxLiveHours: Number(process.env.MAX_LIVE_HOURS || 48),
 };
 
 export function assertYoutubeKey() {

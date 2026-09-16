@@ -64,9 +64,10 @@ app.get('/api/streams', async (req, res) => {
        JOIN channels c ON c.channel_id = l.channel_id
        WHERE l.is_live = true AND c.status = 'active'
          AND (l.concurrent_viewers IS NULL OR l.concurrent_viewers < $2)
+         AND (l.started_at IS NULL OR l.started_at > now() - ($3 * interval '1 hour'))
        ORDER BY (l.concurrent_viewers IS NULL) ASC, l.concurrent_viewers ASC, l.last_checked_at DESC
        LIMIT $1`,
-      [limit, config.maxConcurrentViewers]
+      [limit, config.maxConcurrentViewers, config.maxLiveHours]
     );
 
     const streams = rows.map((r) => ({
@@ -98,8 +99,9 @@ app.get('/api/stats', async (req, res) => {
     const [{ rows: liveCountRows }, { rows: channelCountRows }, quotaUsed] = await Promise.all([
       query(
         `SELECT count(*)::int AS c FROM live_status
-         WHERE is_live = true AND (concurrent_viewers IS NULL OR concurrent_viewers < $1)`,
-        [config.maxConcurrentViewers]
+         WHERE is_live = true AND (concurrent_viewers IS NULL OR concurrent_viewers < $1)
+           AND (started_at IS NULL OR started_at > now() - ($2 * interval '1 hour'))`,
+        [config.maxConcurrentViewers, config.maxLiveHours]
       ),
       query("SELECT status, count(*)::int AS c FROM channels GROUP BY status"),
       getTodayQuotaUsage(),
