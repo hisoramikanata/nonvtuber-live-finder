@@ -1,6 +1,7 @@
 import { assertYoutubeKey } from './config.js';
 import { query, addQuotaUsage } from './db.js';
 import { getVideosStatus } from './youtube.js';
+import { checkPinnedChannelsLive } from './pinnedChannels.js';
 
 function chunk(arr, size) {
   const out = [];
@@ -15,17 +16,19 @@ function chunk(arr, size) {
 export async function runMonitor() {
   assertYoutubeKey();
 
+  const pinnedResult = await checkPinnedChannelsLive();
+
   const { rows } = await query('SELECT video_id FROM live_status WHERE is_live = true');
   const videoIds = rows.map((r) => r.video_id);
 
   if (videoIds.length === 0) {
     console.log('[monitor] 監視対象なし');
-    return { checked: 0, ended: 0 };
+    return { checked: 0, ended: 0, quotaUsed: pinnedResult.quotaUsed };
   }
 
   let checked = 0;
   let ended = 0;
-  let totalQuota = 0;
+  let totalQuota = pinnedResult.quotaUsed;
   const seenIds = new Set();
 
   for (const batch of chunk(videoIds, 50)) {

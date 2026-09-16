@@ -4,6 +4,7 @@ import cron from 'node-cron';
 import { config } from './config.js';
 import { runDiscovery } from './discovery.js';
 import { runMonitor } from './monitor.js';
+import { ensurePinnedChannels } from './pinnedChannels.js';
 
 console.log('[cron] starting worker');
 console.log(`[cron] discovery schedule: ${config.discoveryCron}`);
@@ -33,6 +34,10 @@ cron.schedule(config.monitorCron, () => {
   safeRun('monitor', runMonitor, (v) => (monitorRunning = v));
 });
 
-// 起動直後にも一度実行しておく
-safeRun('discovery', runDiscovery, (v) => (discoveryRunning = v));
-safeRun('monitor', runMonitor, (v) => (monitorRunning = v));
+// 起動直後にも一度実行しておく（ピン留めチャンネルの登録は監視バッチより先に済ませる）
+ensurePinnedChannels()
+  .catch((err) => console.error('[cron] ensurePinnedChannels failed:', err))
+  .finally(() => {
+    safeRun('discovery', runDiscovery, (v) => (discoveryRunning = v));
+    safeRun('monitor', runMonitor, (v) => (monitorRunning = v));
+  });

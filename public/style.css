@@ -64,6 +64,20 @@ main { padding: 16px 20px 40px; max-width: 1200px; margin: 0 auto; }
 
 .card:hover { transform: translateY(-2px); border-color: var(--accent); }
 
+.card.pinned { border-color: #ffb020; box-shadow: 0 0 0 1px #ffb020; }
+
+.pinned-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: #ffb020;
+  color: #1a1d24;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
 .thumb-wrap { position: relative; aspect-ratio: 16 / 9; background: #000; }
 .thumb-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
 

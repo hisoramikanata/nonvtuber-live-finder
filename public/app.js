@@ -27,10 +27,13 @@ function renderCard(stream) {
 
   const low = stream.concurrentViewers !== null && stream.concurrentViewers <= 10;
 
+  if (stream.isPinned) a.classList.add('pinned');
+
   a.innerHTML = `
     <div class="thumb-wrap">
       <img src="${stream.thumbnailUrl || ''}" alt="" loading="lazy" />
       <span class="viewers-badge ${low ? 'low' : ''}">${formatViewers(stream.concurrentViewers)}</span>
+      ${stream.isPinned ? '<span class="pinned-badge">📌 注目</span>' : ''}
     </div>
     <div class="card-body">
       <p class="card-title">${escapeHtml(stream.title || '')}</p>
