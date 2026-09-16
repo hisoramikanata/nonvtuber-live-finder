@@ -45,6 +45,17 @@ async function applyChannelDecision(channelId, channelTitle, decision, reason) {
   }
 }
 
+// ADMIN_TOKENがRailway側にきちんと設定されているかを値を晒さずに確認するための診断用エンドポイント
+app.get('/api/admin/token-check', (req, res) => {
+  const sentToken = req.header('x-admin-token') || '';
+  res.json({
+    adminTokenConfigured: Boolean(config.adminToken),
+    adminTokenLength: config.adminToken.length,
+    sentTokenLength: sentToken.length,
+    matches: Boolean(config.adminToken) && sentToken === config.adminToken,
+  });
+});
+
 function requireAdmin(req, res, next) {
   const token = req.header('x-admin-token');
   if (!config.adminToken || token !== config.adminToken) {
