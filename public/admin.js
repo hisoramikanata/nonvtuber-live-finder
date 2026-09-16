@@ -84,3 +84,11 @@ document.getElementById('run-monitor').addEventListener('click', async () => {
   const data = await res.json();
   showResult(`監視バッチ結果: ${JSON.stringify(data)}`);
 });
+
+document.getElementById('check-token').addEventListener('click', async () => {
+  const res = await fetch('/api/admin/token-check', {
+    headers: { 'x-admin-token': getToken() },
+  });
+  const data = await res.json();
+  showResult(`トークン診断: ${JSON.stringify(data)}`);
+});
