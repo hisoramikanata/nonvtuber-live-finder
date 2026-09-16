@@ -59,14 +59,15 @@ app.get('/api/streams', async (req, res) => {
     const limit = Math.min(Number(req.query.limit) || 100, 200);
     const { rows } = await query(
       `SELECT l.video_id, l.title, l.thumbnail_url, l.concurrent_viewers, l.started_at, l.last_checked_at,
-              c.channel_id, c.channel_title, c.thumbnail_url AS channel_thumbnail_url
+              c.channel_id, c.channel_title, c.thumbnail_url AS channel_thumbnail_url, c.is_pinned
        FROM live_status l
        JOIN channels c ON c.channel_id = l.channel_id
        WHERE l.is_live = true AND c.status = 'active'
-         AND (l.concurrent_viewers IS NULL OR l.concurrent_viewers < $2)
-       ORDER BY (l.concurrent_viewers IS NULL) ASC, l.concurrent_viewers ASC, l.last_checked_at DESC
+         AND (c.is_pinned OR l.concurrent_viewers IS NULL OR l.concurrent_viewers < $2)
+         AND (l.started_at IS NULL OR l.started_at > now() - ($3 * interval '1 hour'))
+       ORDER BY c.is_pinned DESC, (l.concurrent_viewers IS NULL) ASC, l.concurrent_viewers ASC, l.last_checked_at DESC
        LIMIT $1`,
-      [limit, config.maxConcurrentViewers]
+      [limit, config.maxConcurrentViewers, config.maxLiveHours]
     );
 
     const streams = rows.map((r) => ({
@@ -77,6 +78,7 @@ app.get('/api/streams', async (req, res) => {
       concurrentViewers: r.concurrent_viewers,
       startedAt: r.started_at,
       lastCheckedAt: r.last_checked_at,
+      isPinned: r.is_pinned,
       channel: {
         id: r.channel_id,
         title: r.channel_title,
@@ -97,9 +99,12 @@ app.get('/api/stats', async (req, res) => {
   try {
     const [{ rows: liveCountRows }, { rows: channelCountRows }, quotaUsed] = await Promise.all([
       query(
-        `SELECT count(*)::int AS c FROM live_status
-         WHERE is_live = true AND (concurrent_viewers IS NULL OR concurrent_viewers < $1)`,
-        [config.maxConcurrentViewers]
+        `SELECT count(*)::int AS c FROM live_status l
+         JOIN channels c ON c.channel_id = l.channel_id
+         WHERE l.is_live = true
+           AND (c.is_pinned OR l.concurrent_viewers IS NULL OR l.concurrent_viewers < $1)
+           AND (l.started_at IS NULL OR l.started_at > now() - ($2 * interval '1 hour'))`,
+        [config.maxConcurrentViewers, config.maxLiveHours]
       ),
       query("SELECT status, count(*)::int AS c FROM channels GROUP BY status"),
       getTodayQuotaUsage(),

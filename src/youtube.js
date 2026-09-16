@@ -6,6 +6,7 @@ const BASE_URL = 'https://www.googleapis.com/youtube/v3';
 export const QUOTA_COST = {
   SEARCH_LIST: 100,
   VIDEOS_LIST: 1,
+  PLAYLIST_ITEMS_LIST: 1,
 };
 
 async function callApi(endpoint, params) {
@@ -144,6 +145,22 @@ export async function resolveChannel(rawInput) {
     },
     quotaUsed: QUOTA_COST.SEARCH_LIST,
   };
+}
+
+/**
+ * アップロード済み動画プレイリストの最新動画ID一覧を取得する。
+ * search.list（100 units）を使わずにチャンネルの最新動画（配信中なら概ね先頭に来る）を
+ * 安価に確認するためのもの。コスト: 1 unit / 呼び出し。
+ */
+export async function getRecentUploads(playlistId, maxResults = 3) {
+  const data = await callApi('playlistItems', {
+    part: 'contentDetails',
+    playlistId,
+    maxResults,
+  });
+
+  const items = (data.items || []).map((item) => item.contentDetails?.videoId).filter(Boolean);
+  return { items, quotaUsed: QUOTA_COST.PLAYLIST_ITEMS_LIST };
 }
 
 /**
