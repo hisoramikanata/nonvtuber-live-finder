@@ -263,15 +263,25 @@ app.post('/api/admin/requests/:id/resolve', requireAdmin, async (req, res) => {
 
 // 管理用: 手動でバッチを1回叩く（デプロイ直後の動作確認用）
 app.post('/api/admin/run/discovery', requireAdmin, async (req, res) => {
-  const { runDiscovery } = await import('./discovery.js');
-  const result = await runDiscovery();
-  res.json(result);
+  try {
+    const { runDiscovery } = await import('./discovery.js');
+    const result = await runDiscovery();
+    res.json(result);
+  } catch (err) {
+    console.error('[admin] run/discovery failed:', err);
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
 });
 
 app.post('/api/admin/run/monitor', requireAdmin, async (req, res) => {
-  const { runMonitor } = await import('./monitor.js');
-  const result = await runMonitor();
-  res.json(result);
+  try {
+    const { runMonitor } = await import('./monitor.js');
+    const result = await runMonitor();
+    res.json(result);
+  } catch (err) {
+    console.error('[admin] run/monitor failed:', err);
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
 });
 
 app.listen(config.port, () => {
