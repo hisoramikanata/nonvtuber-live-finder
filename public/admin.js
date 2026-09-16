@@ -92,3 +92,13 @@ document.getElementById('check-token').addEventListener('click', async () => {
   const data = await res.json();
   showResult(`トークン診断: ${JSON.stringify(data)}`);
 });
+
+document.getElementById('run-migrate').addEventListener('click', async () => {
+  showResult('マイグレーション実行中…');
+  const res = await fetch('/api/admin/migrate', {
+    method: 'POST',
+    headers: { 'x-admin-token': getToken() },
+  });
+  const data = await res.json();
+  showResult(`マイグレーション結果: ${JSON.stringify(data)}`);
+});

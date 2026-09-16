@@ -273,6 +273,18 @@ app.post('/api/admin/run/discovery', requireAdmin, async (req, res) => {
   }
 });
 
+// 管理用: DBマイグレーションを実行する(Railwayのシェルが使えない場合の代替手段)
+app.post('/api/admin/migrate', requireAdmin, async (req, res) => {
+  try {
+    const { runMigrations } = await import('./migrate.js');
+    const result = await runMigrations();
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('[admin] migrate failed:', err);
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
+
 app.post('/api/admin/run/monitor', requireAdmin, async (req, res) => {
   try {
     const { runMonitor } = await import('./monitor.js');
