@@ -27,7 +27,7 @@ export const config = {
   // 同接数フィルタを無視して常に一覧の上位に固定表示するチャンネル（@handle または チャンネルURL/ID、カンマ区切り）
   pinnedChannelHandles: splitCsv(
     process.env.PINNED_CHANNEL_HANDLES,
-    '@matomonaka,@toakun_dayo,@zeropure5,@tongudesuyo,@shihuyu.24,@hquru_kun,https://youtube.com/channel/UC9tW9r5gO2aLJQgA7T12M2g,@hamab_uta'
+    '@matomonaka,@toakun_dayo,@zeropure5,@tongudesuyo,@shihuyu.24,@hquru_kun,https://youtube.com/channel/UC9tW9r5gO2aLJQgA7T12M2g,@hamab_uta,@os25tama'
   ),
 };
 
