@@ -104,11 +104,11 @@ document.getElementById('run-migrate').addEventListener('click', async () => {
 });
 
 document.getElementById('run-ensure-pinned').addEventListener('click', async () => {
-  showResult('ピン留めチャンネル登録中…');
+  showResult('広告枠チャンネル登録中…');
   const res = await fetch('/api/admin/run/ensure-pinned', {
     method: 'POST',
     headers: { 'x-admin-token': getToken() },
   });
   const data = await res.json();
-  showResult(`ピン留め登録結果: ${JSON.stringify(data)}`);
+  showResult(`広告枠登録結果: ${JSON.stringify(data)}`);
 });

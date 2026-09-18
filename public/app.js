@@ -33,7 +33,7 @@ function renderCard(stream) {
     <div class="thumb-wrap">
       <img src="${stream.thumbnailUrl || ''}" alt="" loading="lazy" />
       <span class="viewers-badge ${low ? 'low' : ''}">${formatViewers(stream.concurrentViewers)}</span>
-      ${stream.isPinned ? '<span class="pinned-badge">📌 注目</span>' : ''}
+      ${stream.isPinned ? '<span class="pinned-badge">📢 広告枠</span>' : ''}
     </div>
     <div class="card-body">
       <p class="card-title">${escapeHtml(stream.title || '')}</p>
