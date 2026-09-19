@@ -39,7 +39,8 @@
       "start": 0,
       "end": 5,
       "captions": [
-        { "text": "まさかの2連発", "start": 0, "end": 5 }
+        { "text": "まさかの2連発", "start": 0, "end": 3 },
+        { "text": "（ここは自主規制区間の例）", "start": 3, "end": 5, "ng": true }
       ]
     },
     {
@@ -62,5 +63,9 @@
         { "text": "もぐもぐもぐ", "start": 0, "end": 6 }
       ]
     }
-  ]
+  ],
+  "ngBeep": {
+    "frequency": 1000,
+    "volume": 1.0
+  }
 }

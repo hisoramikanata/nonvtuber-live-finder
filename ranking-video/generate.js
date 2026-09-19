@@ -32,6 +32,7 @@ const MEDAL_COLORS = {
   3: '0xCD7F32', // bronze
 };
 const MEDAL_COLOR_DEFAULT = '0x4A90D9';
+const NG_CENSOR_TEXT = '◯◯◯◯◯◯';
 
 function fail(message) {
   console.error(`[ranking-video] エラー: ${message}`);
@@ -179,16 +180,17 @@ function buildSegmentFilter({ entry, index, font, width, height, titleH, title, 
   const frameGap = 1 / (fps || 30);
   captions.forEach((cap) => {
     const capEnd = Math.max(cap.start + frameGap, cap.end - frameGap);
+    const isNg = cap.ng === true;
     filters.push(
       drawtextFilter({
         font,
-        text: cap.text,
+        text: isNg ? cap.censoredText ?? NG_CENSOR_TEXT : cap.text,
         fontsize: cap.fontsize ?? Math.round(height * 0.038),
         fontcolor: cap.fontcolor ?? 'white',
         x: '(w-text_w)/2',
         y: Math.round(height * (cap.yRatio ?? 0.82)),
         box: true,
-        boxcolor: 'black@0.65',
+        boxcolor: isNg ? 'red@0.75' : 'black@0.65',
         boxborderw: Math.round(height * 0.016),
         enable: `between(t,${cap.start},${capEnd})`,
       })
@@ -198,21 +200,41 @@ function buildSegmentFilter({ entry, index, font, width, height, titleH, title, 
   return filters.join(',');
 }
 
+// entry内の captions のうち ng:true の区間(音声をピー音に差し替える範囲)を集める
+function collectNgWindows(entry) {
+  return (entry.captions ?? [])
+    .filter((cap) => cap.ng === true)
+    .map((cap) => ({ start: cap.start, end: cap.end }));
+}
+
 function renderSegment({ entry, index, config, font, width, height, titleH, medalSlots, tmpDir, ffmpegLog }) {
   const src = path.resolve(config.baseDir ?? '.', entry.source);
   if (!existsSync(src)) {
     fail(`素材が見つかりません(entries[${index}].source): ${src}`);
   }
 
-  const args = ['-y'];
-  if (entry.start != null) args.push('-ss', String(entry.start));
-  args.push('-i', src);
-  if (entry.start != null && entry.end != null) {
-    args.push('-t', String(entry.end - entry.start));
-  } else if (entry.duration != null) {
-    args.push('-t', String(entry.duration));
+  const duration =
+    entry.start != null && entry.end != null
+      ? entry.end - entry.start
+      : entry.duration ?? null;
+
+  const ngWindows = collectNgWindows(entry);
+  const wantsBeep = !entry.mute && ngWindows.length > 0;
+  if (wantsBeep && duration == null) {
+    fail(
+      `entries[${index}]: captions に ng:true があるのに start/end (または duration) が指定されていません。` +
+        'ピー音の長さを決めるため、区間の長さが必要です。'
+    );
   }
 
+  // -ss/-t は共に入力オプションとして -i の前に置く(2本目以降の入力に誤って
+  // 適用されるのを避けるため)
+  const args = ['-y'];
+  if (entry.start != null) args.push('-ss', String(entry.start));
+  if (duration != null) args.push('-t', String(duration));
+  args.push('-i', src);
+
+  const fps = config.output?.fps ?? 30;
   const vf = buildSegmentFilter({
     entry,
     index,
@@ -223,23 +245,46 @@ function renderSegment({ entry, index, config, font, width, height, titleH, meda
     title: config.title,
     medalSlots,
     medalRanks: config.medalRanks ?? 3,
-    fps: config.output?.fps ?? 30,
+    fps,
   });
 
   const outFile = path.join(tmpDir, `segment_${String(index).padStart(3, '0')}.mp4`);
-  args.push(
-    '-vf', vf,
-    '-r', String(config.output?.fps ?? 30),
+  const encodeArgs = [
+    '-r', String(fps),
     '-pix_fmt', 'yuv420p',
     '-c:v', 'libx264',
     '-preset', config.output?.preset ?? 'veryfast',
-    '-crf', String(config.output?.crf ?? 20)
-  );
+    '-crf', String(config.output?.crf ?? 20),
+  ];
 
-  if (entry.mute) {
-    args.push('-an');
+  if (wantsBeep) {
+    const beepFreq = config.ngBeep?.frequency ?? 1000;
+    const beepVolume = config.ngBeep?.volume ?? 1.0;
+    const orExpr = ngWindows.map((w) => `between(t,${w.start},${w.end})`).join('+');
+    const duckChain = ngWindows
+      .map((w) => `volume=0:enable='between(t,${w.start},${w.end})'`)
+      .join(',');
+
+    args.push('-f', 'lavfi', '-i', `sine=frequency=${beepFreq}:duration=${duration}:sample_rate=48000`);
+    args.push(
+      '-filter_complex',
+      `[0:v]${vf}[vout];` +
+        `[0:a]${duckChain}[voice];` +
+        `[1:a]volume=${beepVolume},volume=0:enable='not(${orExpr})',aformat=channel_layouts=stereo[beep];` +
+        // normalize=0: voiceとbeepは時間的に排他(同時に鳴らない)なので、
+        // amixのデフォルト正規化(normalize=1)を使うと片方が無音の区間で
+        // もう片方まで消えてしまう問題を回避する
+        `[voice][beep]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[aout]`
+    );
+    args.push('-map', '[vout]', '-map', '[aout]');
+    args.push(...encodeArgs, '-c:a', 'aac', '-b:a', '192k', '-ar', '48000');
   } else {
-    args.push('-c:a', 'aac', '-b:a', '192k', '-ar', '48000');
+    args.push('-vf', vf, ...encodeArgs);
+    if (entry.mute) {
+      args.push('-an');
+    } else {
+      args.push('-c:a', 'aac', '-b:a', '192k', '-ar', '48000');
+    }
   }
 
   args.push(outFile);
