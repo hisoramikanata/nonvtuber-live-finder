@@ -1,0 +1,66 @@
+{
+  "title": {
+    "line1": "史上最高のあきれニキ",
+    "line2": "サンドイッチ中毒者",
+    "line1Color": "white",
+    "line2Color": "yellow"
+  },
+  "medalRanks": 3,
+  "output": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "crf": 20,
+    "preset": "veryfast"
+  },
+  "font": {
+    "file": null
+  },
+  "bgm": {
+    "file": "bgm.mp3",
+    "volume": 0.25
+  },
+  "entries": [
+    {
+      "rank": 3,
+      "medalLabel": "外カリ中ふわ",
+      "source": "clips/clip1.mp4",
+      "start": 0,
+      "end": 6,
+      "captions": [
+        { "text": "欧米人の膵臓っていったい…", "start": 0, "end": 3 },
+        { "text": "他人のメガネ粉砕", "start": 3, "end": 6 }
+      ]
+    },
+    {
+      "rank": 2,
+      "medalLabel": "スーパータコス",
+      "source": "clips/clip2.mp4",
+      "start": 0,
+      "end": 5,
+      "captions": [
+        { "text": "まさかの2連発", "start": 0, "end": 5 }
+      ]
+    },
+    {
+      "rank": 4,
+      "medalLabel": null,
+      "source": "clips/clip3.mp4",
+      "start": 0,
+      "end": 4,
+      "captions": [
+        { "text": "圏外だが一応紹介", "start": 0, "end": 4 }
+      ]
+    },
+    {
+      "rank": 1,
+      "medalLabel": "カロリー爆弾",
+      "source": "clips/clip4.mp4",
+      "start": 0,
+      "end": 6,
+      "captions": [
+        { "text": "もぐもぐもぐ", "start": 0, "end": 6 }
+      ]
+    }
+  ]
+}
