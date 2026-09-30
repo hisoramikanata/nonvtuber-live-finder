@@ -273,6 +273,19 @@ app.post('/api/admin/run/discovery', requireAdmin, async (req, res) => {
   }
 });
 
+// 管理用: 登録済みactiveチャンネルを現在のVTuber/除外キーワードで再判定する
+// (vtuberFilter.jsのキーワードを追加・変更した際、過去登録済み分にも遡って適用する)
+app.post('/api/admin/run/reclassify', requireAdmin, async (req, res) => {
+  try {
+    const { reclassifyActiveChannels } = await import('./discovery.js');
+    const result = await reclassifyActiveChannels();
+    res.json(result);
+  } catch (err) {
+    console.error('[admin] run/reclassify failed:', err);
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
+
 // 管理用: ピン留めチャンネル(config.pinnedChannelHandles)をchannelsテーブルに登録する
 app.post('/api/admin/run/ensure-pinned', requireAdmin, async (req, res) => {
   try {

@@ -103,6 +103,16 @@ document.getElementById('run-migrate').addEventListener('click', async () => {
   showResult(`マイグレーション結果: ${JSON.stringify(data)}`);
 });
 
+document.getElementById('run-reclassify').addEventListener('click', async () => {
+  showResult('既存チャンネルを再判定中…');
+  const res = await fetch('/api/admin/run/reclassify', {
+    method: 'POST',
+    headers: { 'x-admin-token': getToken() },
+  });
+  const data = await res.json();
+  showResult(`再判定結果: ${JSON.stringify(data)}`);
+});
+
 document.getElementById('run-ensure-pinned').addEventListener('click', async () => {
   showResult('広告枠チャンネル登録中…');
   const res = await fetch('/api/admin/run/ensure-pinned', {

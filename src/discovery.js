@@ -114,3 +114,38 @@ export async function runDiscovery({ keywords = config.discoveryKeywords } = {})
   console.log(`[discovery] done. found=${found} excluded=${excluded} quota=${totalQuota}`);
   return { skipped: false, found, excluded, quotaUsed: totalQuota };
 }
+
+/**
+ * 既にactive登録済みのチャンネルを、現在のvtuberFilter.jsのキーワードで再判定する。
+ * VTuber判定ルール・除外コンテンツキーワードを追加/変更した際、
+ * 過去に登録済みのチャンネルにも遡って適用するための管理用バッチ。
+ */
+export async function reclassifyActiveChannels() {
+  const { rows } = await query(
+    "SELECT channel_id, channel_title, channel_description FROM channels WHERE status = 'active'"
+  );
+
+  let excluded = 0;
+  const excludedChannels = [];
+
+  for (const row of rows) {
+    const result = classify({
+      channelTitle: row.channel_title,
+      channelDescription: row.channel_description,
+    });
+
+    if (!result.excluded) continue;
+
+    excluded += 1;
+    excludedChannels.push({ channelId: row.channel_id, channelTitle: row.channel_title, reason: result.reason });
+
+    await query(
+      `UPDATE channels SET status = 'excluded', exclude_reason = $2 WHERE channel_id = $1`,
+      [row.channel_id, result.reason]
+    );
+    await query('UPDATE live_status SET is_live = false WHERE channel_id = $1', [row.channel_id]);
+  }
+
+  console.log(`[discovery] reclassify done. checked=${rows.length} excluded=${excluded}`);
+  return { checked: rows.length, excluded, excludedChannels };
+}
