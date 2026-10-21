@@ -113,6 +113,27 @@ document.getElementById('run-reclassify').addEventListener('click', async () => 
   showResult(`再判定結果: ${JSON.stringify(data)}`);
 });
 
+async function setMaintenance(enabled) {
+  const res = await fetch('/api/admin/maintenance', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-admin-token': getToken() },
+    body: JSON.stringify({ enabled }),
+  });
+  const data = await res.json();
+  showResult(`メンテナンス設定結果: ${JSON.stringify(data)}`);
+}
+
+document.getElementById('maintenance-on').addEventListener('click', () => setMaintenance(true));
+document.getElementById('maintenance-off').addEventListener('click', () => setMaintenance(false));
+
+document.getElementById('maintenance-check').addEventListener('click', async () => {
+  const res = await fetch('/api/admin/maintenance', {
+    headers: { 'x-admin-token': getToken() },
+  });
+  const data = await res.json();
+  showResult(`メンテナンス状態: ${JSON.stringify(data)}`);
+});
+
 document.getElementById('run-ensure-pinned').addEventListener('click', async () => {
   showResult('広告枠チャンネル登録中…');
   const res = await fetch('/api/admin/run/ensure-pinned', {

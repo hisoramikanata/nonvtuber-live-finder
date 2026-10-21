@@ -5,11 +5,38 @@ import { config } from './config.js';
 import { query, getTodayQuotaUsage, addQuotaUsage } from './db.js';
 import { resolveChannel } from './youtube.js';
 import { classify } from './vtuberFilter.js';
+import { getMaintenanceMode, setMaintenanceMode } from './settings.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 app.use(express.json());
+
+// メンテナンスモード中は管理画面/管理API以外を一時停止する
+const MAINTENANCE_ALLOWLIST = new Set(['/admin.html', '/admin.js', '/style.css', '/favicon.ico']);
+const MAINTENANCE_HTML = `<!doctype html>
+<html lang="ja"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>メンテナンス中</title>
+<style>body{font-family:sans-serif;background:#0f1115;color:#eef0f4;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:0 20px;}</style>
+</head><body><div><h1>ただいまメンテナンス中です</h1><p>しばらくしてから再度アクセスしてください。</p></div></body></html>`;
+
+app.use(async (req, res, next) => {
+  if (req.path.startsWith('/api/admin') || MAINTENANCE_ALLOWLIST.has(req.path)) {
+    return next();
+  }
+  try {
+    const maintenance = await getMaintenanceMode();
+    if (!maintenance) return next();
+    if (req.path.startsWith('/api/')) {
+      return res.status(503).json({ error: 'maintenance', message: 'ただいまメンテナンス中です。' });
+    }
+    res.status(503).set('Content-Type', 'text/html; charset=utf-8').send(MAINTENANCE_HTML);
+  } catch (err) {
+    console.error('[maintenance] check failed:', err);
+    next();
+  }
+});
+
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // チャンネルURL/ハンドル名/ID等からチャンネル情報を解決する（失敗時はnullを返し、呼び出し元で処理を継続させる）
@@ -318,6 +345,28 @@ app.post('/api/admin/run/monitor', requireAdmin, async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('[admin] run/monitor failed:', err);
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
+
+// 管理用: メンテナンスモードの取得・切り替え
+app.get('/api/admin/maintenance', requireAdmin, async (req, res) => {
+  try {
+    const maintenanceMode = await getMaintenanceMode();
+    res.json({ maintenanceMode });
+  } catch (err) {
+    console.error('[admin] get maintenance failed:', err);
+    res.status(500).json({ error: 'internal_error', message: err.message });
+  }
+});
+
+app.post('/api/admin/maintenance', requireAdmin, async (req, res) => {
+  try {
+    const { enabled } = req.body || {};
+    await setMaintenanceMode(Boolean(enabled));
+    res.json({ ok: true, maintenanceMode: Boolean(enabled) });
+  } catch (err) {
+    console.error('[admin] set maintenance failed:', err);
     res.status(500).json({ error: 'internal_error', message: err.message });
   }
 });
